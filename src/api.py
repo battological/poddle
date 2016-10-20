@@ -84,6 +84,13 @@ class BaseResource(object):
 			raise falcon.HTTPBadRequest('JSON decode error',
 				'The supplied JSON could not be decoded. '
 				'Please supply valid JSON.')
+			
+
+	def _validate_password(self, password):
+		if len(password) < 8 or len(re.sub('[A-Za-z]', '', password)) == 0:
+			raise falcon.HTTPBadRequest('Invalid password',
+				'Your password must be at least 8 characters '
+				'and contain at least 1 number or symbol.')
 
 
 	def _validate_posted_json(self, req, **kwargs):
@@ -124,10 +131,7 @@ class UserRegistrationResource(BaseResource):
 
 		email, password, name = j['email'], j['password'], j['name']
 
-		if not self._validate_password(password):
-			raise falcon.HTTPBadRequest('Invalid password',
-				'Your password must be at least 8 characters '
-				'and contain at least 1 number or symbol.')
+		self._validate_password(password)
 
 		user = User.select().where(User.email == email)
 
@@ -145,9 +149,6 @@ class UserRegistrationResource(BaseResource):
 					'account details. Please try again later.')
 
 		res.body = json.dumps({'id': userId})
-			
-	def _validate_password(self, password):
-		return len(password) > 8 and len(re.sub('[A-Za-z]', '', password)) > 0
 
 # /user/login
 class UserResource(BaseResource):
@@ -205,12 +206,13 @@ class UserInfoResource(BaseResource):
 
 		j = self._parse_json(req)
 
-		if NAME in j:
-			user.name = j[NAME]
-		if EMAIL in j:
-			user.email = j[EMAIL]
-		if PASSWORD in j:
-			user.password = j[PASSWORD]
+		if 'name' in j:
+			user.name = j['name']
+		if 'email' in j:
+			user.email = j['email']
+		if 'password' in j:
+			user.password = j['password']
+			self._validate_password(user.password)
 
 		updated = user.save()
 		
