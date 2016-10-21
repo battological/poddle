@@ -155,6 +155,9 @@ if __name__ == '__main__':
 	assert res.json['id'] == userId
 	assert res.json['name'] == 'Tester'
 
+	# (*) Password should not be visible
+	assert 'password' not in res.json
+
 	# (*) Auth token is correctly ignored, correct information
 	res = app.get(url, headers=auth)
 	standard_test(res)
