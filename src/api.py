@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 from falcon_cors import CORS
 from jose import jwt
+from playhouse.shortcuts import model_to_dict
 
 from models import User, Podcast, Episode, PodcastInteract, EpisodeInteract, db
 from secret import secret
@@ -123,8 +124,42 @@ class BaseRegistrationResource(BaseResource):
 			raise falcon.HTTPInternalServerError('Error saving {}'.format(obj_type),
 				'There was an unknown error saving your '
 				'new {}. Please try again later.'.format(obj_type))
+
 		res.body = json.dumps({'id': ident})
 
+
+class BaseInfoResource(BaseResource):
+
+	def _get(self, res, db_class, ident, *allowed_fields):
+		obj = self._get_from_db(db_class, ident)
+
+		if allowed_fields:
+			r = model_to_dict(obj, recurse=False, only=allowed_fields)
+		else:
+			r = model_to_dict(obj, recurse=False, exclude=[db_class.created])
+
+		res.body = json.dumps(r)
+	
+	def _put_obj(self, req, res, db_class, ident, *allowed_fields):
+		allowed_fields_set = set()
+		for f in allowed_fields:
+			allowed_fields_set.add(f.name)
+
+		obj = self._get_from_db(db_class, ident)
+
+		j = self._parse_json(req)
+
+		for field in j:
+			if field in allowed_fields_set:
+				setattr(obj, field, j[field])
+
+		return obj
+
+	def _delete(self, res, db_class, ident):
+		obj = self._get_from_db(db_class, ident)
+		obj.delete_instance()
+
+		res.status = falcon.HTTP_200
 
 
 ########## MIDDLEWARE ##########
@@ -192,38 +227,21 @@ class UserResource(BaseResource):
 
 
 # /user/{userId}
-class UserInfoResource(BaseResource):
+class UserInfoResource(BaseInfoResource):
 
 	def on_get(self, req, res, userId):
-		user = self._get_from_db(User, userId)
-
-		r = {'id': user.id, 'name': user.name}
-
-		res.body = json.dumps(r)
+		self._get(res, User, userId, User.id, User.name)
 
 	@falcon.before(authenticate)
 	def on_put(self, req, res, userId):
-		user  = self._get_from_db(User, userId)
-
-		j = self._parse_json(req)
-
-		if 'name' in j:
-			user.name = j['name']
-		if 'email' in j:
-			user.email = j['email']
-		if 'password' in j:
-			user.password = j['password']
-			self._validate_password(user.password)
-
+		user = self._put_obj(req, res, User, userId, User.name, User.email, User.password)
+		self._validate_password(user.password)
 		updated = user.save()
 		
 
 	@falcon.before(authenticate)
 	def on_delete(self, req, res, userId):
-		user = self._get_from_db(User, userId)
-		user.delete_instance()
-		
-		res.status = falcon.HTTP_200
+		self._delete(res, User, userId)
 
 
 # /podcast/new
@@ -239,19 +257,25 @@ class PodcastRegistrationResource(BaseRegistrationResource):
 
 
 # /podcast/{podcastId}
-class PodcastInfoResource(BaseResource):
+class PodcastInfoResource(BaseInfoResource):
 
 	def on_get(self, req, res, podcastId):
-		podcast = self._get_from_db(Podcast, podcastId)
+		self._get(res, Podcast, podcastId)
 
-		r = {'link': podcast.link,
-			'title': podcast.title, 
-			'description': podcast.description}
-		if podcast.image:
-			r['image'] = podcast.image
+	@falcon.before(authenticate)
+	def on_put(self, req, res, podcastId):
+		podcast = self._put_obj(req,
+			res,
+			Podcast,
+			podcastId,
+			Podcast.link,
+			Podcast.title,
+			Podcast.description,
+			Podcast.image)
 
-		res.body = json.dumps(r)
-		
+	@falcon.before(authenticate)
+	def on_put(self, req, res, podcastId):
+		self._delete(res, Podcast, podcastId)
 
 # Add routes
 cors = CORS(allow_all_origins=True,
