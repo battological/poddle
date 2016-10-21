@@ -224,6 +224,33 @@ class UserInfoResource(BaseResource):
 		user.delete_instance()
 		
 		res.status = falcon.HTTP_200
+
+
+# /podcast/new
+class PodcastRegistrationResource(BaseRegistrationResource):
+
+	def on_post(self, req, res):
+		j = self._validate_posted_json(req,
+			link=True,
+			title=True,
+			description=True,
+			image=False)
+		self._register(res, j, Podcast)
+
+
+# /podcast/{podcastId}
+class PodcastInfoResource(BaseResource):
+
+	def on_get(self, req, res, podcastId):
+		podcast = self._get_from_db(Podcast, podcastId)
+
+		r = {'link': podcast.link,
+			'title': podcast.title, 
+			'description': podcast.description}
+		if podcast.image:
+			r['image'] = podcast.image
+
+		res.body = json.dumps(r)
 		
 
 # Add routes
@@ -240,3 +267,8 @@ app = falcon.API(middleware=[
 app.add_route('/api/user/register', UserRegistrationResource())
 app.add_route('/api/user/login', UserResource())
 app.add_route('/api/user/{userId}', UserInfoResource())
+
+# Podcast interactions
+app.add_route('/api/podcast/new', PodcastRegistrationResource())
+app.add_route('/api/podcast/{podcastId}', PodcastInfoResource())
+#app.add_route('/api/podcast/review', PodcastReviewResource())

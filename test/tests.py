@@ -8,7 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(
 	'src')))
 
 from api import app
-from models import User
+from models import User, Podcast
 
 
 # Verbs
@@ -29,6 +29,9 @@ user_name_edited = 'Edited'
 user_email_edited = 'edited@edited.com'
 user_password_edited = 'edited123'
 
+# Test podcast details
+podcast_link = "http://test.com/feed"
+
 def testing(url, verb=None):
 	if verb is None:
 		verb = TEST
@@ -41,10 +44,10 @@ def standard_test(res):
 	assert res.content_type == 'application/json'
 	assert res.content_length > 0
 
-def clear_user(email):
-	user = User.select().where(User.email == email)
-	if user.exists():
-		user.get().delete_instance()
+def clear_obj(db_class, prop_name, prop_value):
+	obj = db_class.select().where(getattr(db_class, prop_name) == prop_value)
+	if obj.exists():
+		obj.get().delete_instance()
 
 
 if __name__ == '__main__':
@@ -57,9 +60,10 @@ if __name__ == '__main__':
 	With on delete cascade turned on, this should automatically clear
 	   all testing data.
 	'''
-	clear_user(user_email)
-	clear_user(altuser_email)
-	clear_user(user_email_edited)
+	clear_obj(User, 'email', user_email)
+	clear_obj(User, 'email', altuser_email)
+	clear_obj(User, 'email', user_email_edited)
+	clear_obj(Podcast, 'link', podcast_link)
 
 
 	### USER REGISTRATION ###
@@ -192,3 +196,35 @@ if __name__ == '__main__':
 		"email": user_email,
 		"password": user_password},
 		headers=auth)
+
+
+	### PODCAST REGISTRATION ###
+	url = testing('/api/podcast/new', POST)
+
+	# (X) Leave out required info
+	app.post_json(url,
+		{"title": "TestCast",
+		"description": "Test description"},
+		status=400)
+	app.post_json(url,
+		{"link": podcast_link,
+		"description": "Test description"},
+		status=400)
+	app.post_json(url,
+		{"link": podcast_link,
+		"title": "TestCast"},
+		status=400)
+
+	# (*) Successfully register
+	res = app.post_json(url,
+		{"link": podcast_link,
+		"title": "TestCast",
+		"description": "Test description"})
+	podcastId = res.json['id']
+
+	# (X) Podcast exists
+	app.post_json(url,
+		{"link": podcast_link,
+		"title": "TestCast",
+		"description": "Test description"},
+		status=409)
