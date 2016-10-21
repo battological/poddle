@@ -1,5 +1,6 @@
 import falcon
 import json
+import peewee
 import pprint
 import re
 import time
@@ -98,7 +99,7 @@ class BaseResource(object):
 
 		if kwargs is not None:
 			for field, required in kwargs.iteritems():
-				if field not in j:
+				if field not in j or len(j[field].strip()) == 0:
 					if required:
 						raise falcon.HTTPBadRequest('JSON missing {}.'.format(field),
 							'The supplied JSON did not include a required "{}" field. '
@@ -106,6 +107,24 @@ class BaseResource(object):
 					j[field] = None
 
 		return j
+
+
+class BaseRegistrationResource(BaseResource):
+
+	def _register(self, res, json_req, db_class):
+		try:
+			ident = db_class.create(**json_req).id
+		except peewee.IntegrityError as e:
+			in_use = str(e).split('.')[-1].strip() # hack to see which field is problematic
+			raise falcon.HTTPConflict('{} in use'.format(in_use.title()),
+				'The {} you provided is already in use.'.format(in_use))
+		except Exception:
+			obj_type = db_class.__name__.lower()
+			raise falcon.HTTPInternalServerError('Error saving {}'.format(obj_type),
+				'There was an unknown error saving your '
+				'new {}. Please try again later.'.format(obj_type))
+		res.body = json.dumps({'id': ident})
+
 
 
 ########## MIDDLEWARE ##########
@@ -124,32 +143,14 @@ class DBConnectMiddleware(object):
 ########## RESOURCES ##########
 
 # /user/register
-class UserRegistrationResource(BaseResource):
+class UserRegistrationResource(BaseRegistrationResource):
 
 	def on_post(self, req, res):
 		j = self._validate_posted_json(req, email=True, password=True, name=True)
+		self._validate_password(j['password'])
+		self._register(res, j, User)
 
-		email, password, name = j['email'], j['password'], j['name']
-
-		self._validate_password(password)
-
-		user = User.select().where(User.email == email)
-
-		if user.exists():
-			raise falcon.HTTPConflict('Email in use',
-				'The email address you provided is already in use.')
-		else:
-			try:
-				userId = User.create(email=email,
-					password=password,
-					name=name).id
-			except:
-				raise falcon.HTTPInternalServerError('Error saving user',
-					'There was an unknown error saving your '
-					'account details. Please try again later.')
-
-		res.body = json.dumps({'id': userId})
-
+		
 # /user/login
 class UserResource(BaseResource):
 
