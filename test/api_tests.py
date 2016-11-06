@@ -3,7 +3,6 @@ from webtest import TestApp
 from src.api import app
 from src.db.models import User, Podcast
 
-
 # Verbs
 TEST = 'Testing'
 GET = 'Getting'
