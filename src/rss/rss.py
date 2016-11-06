@@ -1,6 +1,5 @@
 from xml.dom import getDOMImplementation
 
-
 TEXT_ATTRIBUTE = '_text'
 
 
@@ -38,6 +37,9 @@ class RSSWriter(object):
 
     def __str__(self):
         return self._xml.toxml('utf-8')
+
+    def add_to_channel(self, name, text=None, **attributes):
+        self._append_new(self._channel, RSSElement(name, text, **attributes))
 
     def add_item(self, title=None, description=None, **optionals):
         """

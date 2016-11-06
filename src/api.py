@@ -8,10 +8,10 @@ from falcon_cors import CORS
 from jose import jwt
 from playhouse.shortcuts import model_to_dict
 
-from db.middleware import DBConnectMiddleware
-from db.models import User, Podcast
-from rss.rss import RSSWriter
 from config.secret import secret
+from db.middleware import DBConnectMiddleware
+from db.models import Episode, Podcast, User
+from rss.rss import RSSWriter
 
 
 # UTILITY METHODS #
@@ -117,13 +117,15 @@ class BaseRegistrationResource(BaseResource):
 
 
 class BaseInfoResource(BaseResource):
+    def _get(self, db_class, ident, *allowed_fields):
+        obj = self._get_from_db(db_class, ident)
 
         if allowed_fields:
             r = model_to_dict(obj, recurse=False, only=allowed_fields)
         else:
             r = model_to_dict(obj, recurse=False, exclude=[db_class.created])
 
-        res.body = json.dumps(r)
+        return r
 
     def _put_obj(self, req, db_class, ident, *allowed_fields):
         allowed_fields_set = set()
@@ -199,7 +201,8 @@ class UserResource(BaseResource):
 # /user/{user_id}
 class UserInfoResource(BaseInfoResource):
     def on_get(self, req, res, user_id):
-        self._get(res, User, user_id, User.id, User.name)
+        r = self._get(User, user_id, User.id, User.name)
+        res.body = json.dumps(r)
 
     @falcon.before(authenticate)
     def on_put(self, req, res, user_id):
@@ -226,11 +229,15 @@ class PodcastRegistrationResource(BaseRegistrationResource):
 # /podcast/{podcast_id}
 class PodcastInfoResource(BaseInfoResource):
     def on_get(self, req, res, podcast_id, format_):
+        podcast = self._get_from_db(Podcast, podcast_id)
         if format_.lower() == 'json':
-            self._get(res, Podcast, podcast_id)
+            podcast = model_to_dict(podcast, backrefs=True, exclude=[Podcast.created, Episode.created])
+            res.body = json.dumps(podcast)
         elif format_.lower() == 'rss' or format_.lower() == 'xml':
-            podcast = self._get_from_db(Podcast, podcast_id)
-
+            rss = RSSWriter(podcast.title, podcast.link, podcast.description)
+            if podcast.image:
+                rss.add_to_channel('itunes:image', href=podcast.image)
+            res.body = str(rss)
         else:
             raise falcon.HTTPInvalidParam('Specify "json" or "rss"',
                                           'format')
@@ -269,5 +276,5 @@ app.add_route('/api/user/{user_id}', UserInfoResource())
 
 # Podcast interactions
 app.add_route('/api/podcast/new', PodcastRegistrationResource())
-app.add_route('/api/podcast/{podcast_id}/{format}', PodcastInfoResource())
+app.add_route('/api/podcast/{podcast_id}/{format_}', PodcastInfoResource())
 # app.add_route('/api/podcast/review', PodcastReviewResource())
