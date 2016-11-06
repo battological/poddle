@@ -21,7 +21,9 @@ class RSSWriter(object):
                           element_name={attribute_name: attribute_value, ..., ['_text': element_text]}
         """
         self._xml = getDOMImplementation().createDocument(None, None, None)
-        rss = self._append_new(self._xml, RSSElement('rss', version='2.0'))
+        rss = self._append_new(self._xml, RSSElement('rss',
+                                                     version='2.0',
+                                                     **{'xmlns:itunes': 'http://www.itunes.com/dtds/podcast-1.0.dtd'}))
 
         self._channel = self._append_new(rss, RSSElement('channel'))
 

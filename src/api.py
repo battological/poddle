@@ -8,8 +8,10 @@ from falcon_cors import CORS
 from jose import jwt
 from playhouse.shortcuts import model_to_dict
 
-from models import User, Podcast, db
-from secret import secret
+from db.middleware import DBConnectMiddleware
+from db.models import User, Podcast
+from rss.rss import RSSWriter
+from config.secret import secret
 
 
 # UTILITY METHODS #
@@ -143,18 +145,6 @@ class BaseInfoResource(BaseResource):
         obj.delete_instance()
 
         res.status = falcon.HTTP_200
-
-
-# MIDDLEWARE #
-
-# Ensure database connection is opened and closed for each request
-class DBConnectMiddleware(object):
-    def process_request(self, req, res):
-        db.connect()
-
-    def process_response(self, req, res, resource):
-        if not db.is_closed():
-            db.close()
 
 
 # RESOURCES #

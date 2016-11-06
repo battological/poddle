@@ -1,15 +1,8 @@
-import os.path
-import sys
-
 from webtest import TestApp
 
-sys.path.append(os.path.abspath(os.path.join(
-    os.path.dirname(__file__),
-    os.path.pardir,
-    'src')))
+from src.api import app
+from src.db.models import User, Podcast
 
-from api import app
-from models import User, Podcast
 
 # Verbs
 TEST = 'Testing'

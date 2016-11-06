@@ -6,6 +6,7 @@ from playhouse.fields import PasswordField
 
 db_path = os.path.abspath(os.path.join(os.path.dirname(__file__),
 	os.path.pardir,
+	os.path.pardir,
 	'poddle.db'))
 db = SqliteDatabase(db_path, pragmas=[('foreign_keys', 'ON')])
 
